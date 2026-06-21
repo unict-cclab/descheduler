@@ -58,6 +58,28 @@ advantage of being able to be run multiple times without needing user interventi
 The descheduler pod is run as a critical pod in the `kube-system` namespace to avoid
 being evicted by itself or by the kubelet.
 
+### Run locally for development
+
+The descheduler can run directly on the development host against the cluster
+selected by a kubeconfig. Build it and start with a dry run first:
+
+```shell
+make build
+./_output/bin/descheduler \
+  --client-connection-kubeconfig="${KUBECONFIG:-$HOME/.kube/config}" \
+  --policy-config-file=examples/local-min-pod-lifetime.yml \
+  --dry-run \
+  --v=3
+```
+
+This performs one descheduling cycle and reports the proposed evictions without
+executing them. Inspect the output and remove `--dry-run` only when real
+evictions are intended. To keep running development cycles, also pass an
+interval such as `--descheduling-interval=30s`; stop the process with `Ctrl+C`.
+
+Use another file from [`examples`](examples) or edit a copy of the local policy
+to exercise a different plugin. Run `make test-unit` after changing the code.
+
 ### Run As A Job
 
 ```
