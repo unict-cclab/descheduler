@@ -1,0 +1,57 @@
+# HighNetworkCost policy for the Online Boutique application.
+#
+# Kubeconfig cannot be embedded in a DeschedulerPolicy file. Pass it on the CLI:
+#
+#   cd /home/angelo/projects/research/descheduler
+#   make build
+#   ./_output/bin/descheduler \
+#     --client-connection-kubeconfig /home/angelo/projects/research/kubeconfig-ctx-cluster-01 \
+#     --policy-config-file examples/high-network-cost.yml \
+#     --dry-run \
+#     --v=3
+#
+# Remove --dry-run only after verifying the selected pod and calculated cost.
+# The plugin evicts at most one pod per cycle: the eligible pod with the greatest
+# cost reduction available on a feasible alternative node. Cost is the sum of
+# node latency multiplied by application traffic to peer pods.
+#
+# minPodAgeSeconds prevents a newly scheduled pod from being immediately
+# reconsidered. minCommunicationCost: 0 requires the selected pod to have a
+# positive cost. The group selector excludes infrastructure pods, while the
+# component expression explicitly excludes the per-node node-proxy gateways.
+#
+# Istio-injected pods use emptyDir volumes, which count as local storage. The
+# default local-storage protection is disabled so those application pods remain
+# eligible for eviction.
+apiVersion: descheduler/v1alpha2
+kind: DeschedulerPolicy
+maxNoOfPodsToEvictPerNode: 1
+maxNoOfPodsToEvictTotal: 1
+profiles:
+  - name: high-network-cost
+    pluginConfig:
+      - name: DefaultEvictor
+        args:
+          podProtections:
+            defaultDisabled:
+              - PodsWithLocalStorage
+      - name: HighNetworkCost
+        args:
+          minPodAgeSeconds: 60
+          minCommunicationCost: 0
+          minCostImprovement: 0
+          namespaces:
+            include:
+              - default
+          labelSelector:
+            matchLabels:
+              group: onlineboutique
+            matchExpressions:
+              - key: component
+                operator: NotIn
+                values:
+                  - node-proxy
+    plugins:
+      deschedule:
+        enabled:
+          - HighNetworkCost
