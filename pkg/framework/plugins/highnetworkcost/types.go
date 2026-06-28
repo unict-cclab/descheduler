@@ -6,7 +6,7 @@ import (
 	"sigs.k8s.io/descheduler/pkg/api"
 )
 
-// HighNetworkCostArgs configures selection of the pod with the greatest feasible cost reduction.
+// HighNetworkCostArgs configures selection of pods with feasible cost reductions.
 type HighNetworkCostArgs struct {
 	metav1.TypeMeta      `json:",inline"`
 	Namespaces           *api.Namespaces       `json:"namespaces,omitempty"`
@@ -14,6 +14,7 @@ type HighNetworkCostArgs struct {
 	MinPodAgeSeconds     *uint                 `json:"minPodAgeSeconds,omitempty"`
 	MinCommunicationCost float64               `json:"minCommunicationCost,omitempty"`
 	MinCostImprovement   float64               `json:"minCostImprovement,omitempty"`
+	SelectionPolicy      string                `json:"selectionPolicy,omitempty"`
 }
 
 func (in *HighNetworkCostArgs) DeepCopyInto(out *HighNetworkCostArgs) {

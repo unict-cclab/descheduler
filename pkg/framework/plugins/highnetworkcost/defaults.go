@@ -8,4 +8,7 @@ func SetDefaults_HighNetworkCostArgs(obj runtime.Object) {
 		value := uint(60)
 		args.MinPodAgeSeconds = &value
 	}
+	if args.SelectionPolicy == "" {
+		args.SelectionPolicy = SelectionPolicyHighestImprovement
+	}
 }

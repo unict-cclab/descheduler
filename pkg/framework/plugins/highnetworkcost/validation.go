@@ -25,5 +25,8 @@ func ValidateHighNetworkCostArgs(obj runtime.Object) error {
 	if args.MinCostImprovement < 0 {
 		errs = append(errs, fmt.Errorf("minCostImprovement must be non-negative"))
 	}
+	if args.SelectionPolicy != "" && args.SelectionPolicy != SelectionPolicyHighestImprovement && args.SelectionPolicy != SelectionPolicyWeightedRandom {
+		errs = append(errs, fmt.Errorf("selectionPolicy must be one of %q or %q", SelectionPolicyHighestImprovement, SelectionPolicyWeightedRandom))
+	}
 	return utilerrors.NewAggregate(errs)
 }

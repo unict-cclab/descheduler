@@ -11,9 +11,17 @@
 #     --v=3
 #
 # Remove --dry-run only after verifying the selected pod and calculated cost.
-# The plugin evicts at most one pod per cycle: the eligible pod with the greatest
-# cost reduction available on a feasible alternative node. Cost is the sum of
-# node latency multiplied by application traffic to peer pods.
+# The plugin evicts eligible pods with cost reduction available on feasible
+# alternative nodes until the configured eviction limits are reached. Cost is
+# the sum of latency and traffic ratios to peer pods.
+# selectionPolicy: HighestImprovement evicts only the eligible pod with the
+# largest available cost improvement. Use WeightedRandom to sample eligible pods
+# with probability proportional to the available cost improvement, so smaller
+# but still useful moves can happen across repeated descheduler cycles. Increase
+# maxNoOfPodsToEvictTotal only when using a selection policy that can select
+# multiple pods in one cycle.
+# Use PodDisruptionBudgets on application Deployments to enforce availability
+# during eviction.
 #
 # minPodAgeSeconds prevents a newly scheduled pod from being immediately
 # reconsidered. minCommunicationCost: 0 requires the selected pod to have a
@@ -25,8 +33,8 @@
 # eligible for eviction.
 apiVersion: descheduler/v1alpha2
 kind: DeschedulerPolicy
-maxNoOfPodsToEvictPerNode: 1
-maxNoOfPodsToEvictTotal: 1
+#maxNoOfPodsToEvictPerNode: 1
+#maxNoOfPodsToEvictTotal: 5
 profiles:
   - name: high-network-cost
     pluginConfig:
@@ -40,6 +48,7 @@ profiles:
           minPodAgeSeconds: 60
           minCommunicationCost: 0
           minCostImprovement: 0
+          selectionPolicy: WeightedRandom
           namespaces:
             include:
               - default
