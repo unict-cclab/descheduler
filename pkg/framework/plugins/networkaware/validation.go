@@ -1,4 +1,4 @@
-package highnetworkcost
+package networkaware
 
 import (
 	"fmt"
@@ -8,8 +8,8 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
-func ValidateHighNetworkCostArgs(obj runtime.Object) error {
-	args := obj.(*HighNetworkCostArgs)
+func ValidateNetworkAwareArgs(obj runtime.Object) error {
+	args := obj.(*NetworkAwareArgs)
 	var errs []error
 	if args.Namespaces != nil && len(args.Namespaces.Include) > 0 && len(args.Namespaces.Exclude) > 0 {
 		errs = append(errs, fmt.Errorf("only one of Include/Exclude namespaces can be set"))
@@ -24,9 +24,6 @@ func ValidateHighNetworkCostArgs(obj runtime.Object) error {
 	}
 	if args.MinCostImprovement < 0 {
 		errs = append(errs, fmt.Errorf("minCostImprovement must be non-negative"))
-	}
-	if args.SelectionPolicy != "" && args.SelectionPolicy != SelectionPolicyHighestImprovement && args.SelectionPolicy != SelectionPolicyWeightedRandom {
-		errs = append(errs, fmt.Errorf("selectionPolicy must be one of %q or %q", SelectionPolicyHighestImprovement, SelectionPolicyWeightedRandom))
 	}
 	return utilerrors.NewAggregate(errs)
 }

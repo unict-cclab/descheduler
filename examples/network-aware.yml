@@ -1,0 +1,52 @@
+# NetworkAware policy for index-layered convergence.
+#
+# Kubeconfig cannot be embedded in a DeschedulerPolicy file. Pass it on the CLI:
+#
+#   cd /home/angelo/projects/research/descheduler
+#   make build
+#   ./_output/bin/descheduler \
+#     --client-connection-kubeconfig /home/angelo/projects/research/kubeconfig-ctx-cluster-01 \
+#     --policy-config-file examples/network-aware.yml \
+#     --dry-run \
+#     --v=3
+#
+# Remove --dry-run only after verifying the selected index layer and calculated
+# costs. Each cycle starts at minPodIndex, finds the lowest index with at least
+# one feasible cost-improving pod, and only attempts pods from that index. If
+# maxPodsToEvict is omitted, every improving pod in that selected layer may be
+# evicted, subject to DefaultEvictor and global Descheduler limits.
+apiVersion: descheduler/v1alpha2
+kind: DeschedulerPolicy
+# Optional global safety limits.
+# maxNoOfPodsToEvictPerNode: 1
+# maxNoOfPodsToEvictTotal: 5
+profiles:
+  - name: network-aware
+    pluginConfig:
+      - name: DefaultEvictor
+        args:
+          podProtections:
+            defaultDisabled:
+              - PodsWithLocalStorage
+      - name: NetworkAware
+        args:
+          minPodAgeSeconds: 30
+          minPodIndex: 0
+          minCommunicationCost: 0
+          minCostImprovement: 0
+          ignoreSameZoneNetworkCost: true
+          namespaces:
+            include:
+              - default
+          labelSelector:
+            matchLabels:
+              group: onlineboutique
+            matchExpressions:
+              - key: component
+                operator: NotIn
+                values:
+                  - node-proxy
+    plugins:
+      deschedule:
+        enabled:
+          - NetworkAware

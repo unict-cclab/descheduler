@@ -19,7 +19,7 @@ package descheduler
 import (
 	"sigs.k8s.io/descheduler/pkg/framework/pluginregistry"
 	"sigs.k8s.io/descheduler/pkg/framework/plugins/defaultevictor"
-	"sigs.k8s.io/descheduler/pkg/framework/plugins/highnetworkcost"
+	"sigs.k8s.io/descheduler/pkg/framework/plugins/networkaware"
 	"sigs.k8s.io/descheduler/pkg/framework/plugins/nodeutilization"
 	"sigs.k8s.io/descheduler/pkg/framework/plugins/podlifetime"
 	"sigs.k8s.io/descheduler/pkg/framework/plugins/removeduplicates"
@@ -37,7 +37,7 @@ func SetupPlugins() {
 }
 
 func RegisterDefaultPlugins(registry pluginregistry.Registry) {
-	pluginregistry.Register(highnetworkcost.PluginName, highnetworkcost.New, &highnetworkcost.HighNetworkCost{}, &highnetworkcost.HighNetworkCostArgs{}, highnetworkcost.ValidateHighNetworkCostArgs, highnetworkcost.SetDefaults_HighNetworkCostArgs, registry)
+	pluginregistry.Register(networkaware.PluginName, networkaware.New, &networkaware.NetworkAware{}, &networkaware.NetworkAwareArgs{}, networkaware.ValidateNetworkAwareArgs, networkaware.SetDefaults_NetworkAwareArgs, registry)
 	pluginregistry.Register(defaultevictor.PluginName, defaultevictor.New, &defaultevictor.DefaultEvictor{}, &defaultevictor.DefaultEvictorArgs{}, defaultevictor.ValidateDefaultEvictorArgs, defaultevictor.SetDefaults_DefaultEvictorArgs, registry)
 	pluginregistry.Register(nodeutilization.LowNodeUtilizationPluginName, nodeutilization.NewLowNodeUtilization, &nodeutilization.LowNodeUtilization{}, &nodeutilization.LowNodeUtilizationArgs{}, nodeutilization.ValidateLowNodeUtilizationArgs, nodeutilization.SetDefaults_LowNodeUtilizationArgs, registry)
 	pluginregistry.Register(nodeutilization.HighNodeUtilizationPluginName, nodeutilization.NewHighNodeUtilization, &nodeutilization.HighNodeUtilization{}, &nodeutilization.HighNodeUtilizationArgs{}, nodeutilization.ValidateHighNodeUtilizationArgs, nodeutilization.SetDefaults_HighNodeUtilizationArgs, registry)

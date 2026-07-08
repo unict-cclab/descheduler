@@ -67,7 +67,7 @@ selected by a kubeconfig. Build it and start with a dry run first:
 make build
 ./_output/bin/descheduler \
   --client-connection-kubeconfig="${KUBECONFIG:-$HOME/.kube/config}" \
-  --policy-config-file=examples/high-network-cost.yml \
+  --policy-config-file=examples/network-aware.yml \
   --dry-run \
   --v=3
 ```

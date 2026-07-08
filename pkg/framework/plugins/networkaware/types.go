@@ -1,4 +1,4 @@
-package highnetworkcost
+package networkaware
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -6,18 +6,22 @@ import (
 	"sigs.k8s.io/descheduler/pkg/api"
 )
 
-// HighNetworkCostArgs configures selection of pods with feasible cost reductions.
-type HighNetworkCostArgs struct {
+// NetworkAwareArgs configures index-layered network-aware pod eviction.
+type NetworkAwareArgs struct {
 	metav1.TypeMeta      `json:",inline"`
 	Namespaces           *api.Namespaces       `json:"namespaces,omitempty"`
 	LabelSelector        *metav1.LabelSelector `json:"labelSelector,omitempty"`
 	MinPodAgeSeconds     *uint                 `json:"minPodAgeSeconds,omitempty"`
+	MinPodIndex          *int                  `json:"minPodIndex,omitempty"`
 	MinCommunicationCost float64               `json:"minCommunicationCost,omitempty"`
 	MinCostImprovement   float64               `json:"minCostImprovement,omitempty"`
-	SelectionPolicy      string                `json:"selectionPolicy,omitempty"`
+	MaxPodsToEvict       *uint                 `json:"maxPodsToEvict,omitempty"`
+	// IgnoreSameZoneNetworkCost treats communication between nodes in the same
+	// topology.kubernetes.io/zone as zero network cost.
+	IgnoreSameZoneNetworkCost bool `json:"ignoreSameZoneNetworkCost,omitempty"`
 }
 
-func (in *HighNetworkCostArgs) DeepCopyInto(out *HighNetworkCostArgs) {
+func (in *NetworkAwareArgs) DeepCopyInto(out *NetworkAwareArgs) {
 	*out = *in
 	if in.Namespaces != nil {
 		out.Namespaces = in.Namespaces.DeepCopy()
@@ -29,15 +33,23 @@ func (in *HighNetworkCostArgs) DeepCopyInto(out *HighNetworkCostArgs) {
 		value := *in.MinPodAgeSeconds
 		out.MinPodAgeSeconds = &value
 	}
+	if in.MinPodIndex != nil {
+		value := *in.MinPodIndex
+		out.MinPodIndex = &value
+	}
+	if in.MaxPodsToEvict != nil {
+		value := *in.MaxPodsToEvict
+		out.MaxPodsToEvict = &value
+	}
 }
 
-func (in *HighNetworkCostArgs) DeepCopy() *HighNetworkCostArgs {
+func (in *NetworkAwareArgs) DeepCopy() *NetworkAwareArgs {
 	if in == nil {
 		return nil
 	}
-	out := new(HighNetworkCostArgs)
+	out := new(NetworkAwareArgs)
 	in.DeepCopyInto(out)
 	return out
 }
 
-func (in *HighNetworkCostArgs) DeepCopyObject() runtime.Object { return in.DeepCopy() }
+func (in *NetworkAwareArgs) DeepCopyObject() runtime.Object { return in.DeepCopy() }
