@@ -32,6 +32,10 @@ before downstream indexes are considered.
 Pods without a valid integer `index` label are ignored. The cost model uses
 `traffic.<app>` Deployment annotations and node annotations named
 `network-latency.<node>`, `network-bandwidth.<node>`, and `packet-loss.<node>`.
+Migration candidates in the pod's current zone are excluded before node-fit
+checks and scoring, so an eviction is proposed only when a feasible target in
+a different zone has sufficient cost improvement. Nodes with a missing zone
+label remain eligible because their zone relationship cannot be determined.
 When `ignoreSameZoneNetworkCost` is true, communication between nodes with the
 same non-empty `topology.kubernetes.io/zone` label contributes zero network
 cost, making same-zone placement equivalent to same-node placement for this

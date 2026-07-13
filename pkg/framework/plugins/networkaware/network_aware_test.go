@@ -55,6 +55,35 @@ func TestReachedMaxPodsToEvictUsesConfiguredLimit(t *testing.T) {
 	}
 }
 
+func TestCrossZoneAlternativeNodesExcludesCurrentAndSameZoneNodes(t *testing.T) {
+	nodes := []*v1.Node{
+		node("current", "zone-a"),
+		node("same-zone", "zone-a"),
+		node("other-zone", "zone-b"),
+	}
+	p := pod("frontend", "default", "1", "shop", "frontend", "1", "current")
+
+	alternatives := crossZoneAlternativeNodes(p, nodes)
+
+	if len(alternatives) != 1 || alternatives[0].Name != "other-zone" {
+		t.Fatalf("alternatives = %v, want only other-zone", nodeNames(alternatives))
+	}
+}
+
+func TestCrossZoneAlternativeNodesKeepsNodesWithUnknownZone(t *testing.T) {
+	nodes := []*v1.Node{
+		node("current", "zone-a"),
+		node("unknown-zone", ""),
+	}
+	p := pod("frontend", "default", "1", "shop", "frontend", "1", "current")
+
+	alternatives := crossZoneAlternativeNodes(p, nodes)
+
+	if len(alternatives) != 1 || alternatives[0].Name != "unknown-zone" {
+		t.Fatalf("alternatives = %v, want unknown-zone", nodeNames(alternatives))
+	}
+}
+
 func TestCommunicationCostMirrorsSchedulerModel(t *testing.T) {
 	metrics := nodeNetworkMetrics{
 		latency:    100,
@@ -169,4 +198,20 @@ func pod(name, namespace, uid, group, app, index, node string) *v1.Pod {
 		},
 		Spec: v1.PodSpec{NodeName: node},
 	}
+}
+
+func node(name, zone string) *v1.Node {
+	labels := map[string]string{}
+	if zone != "" {
+		labels[v1.LabelTopologyZone] = zone
+	}
+	return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels}}
+}
+
+func nodeNames(nodes []*v1.Node) []string {
+	names := make([]string, 0, len(nodes))
+	for _, node := range nodes {
+		names = append(names, node.Name)
+	}
+	return names
 }

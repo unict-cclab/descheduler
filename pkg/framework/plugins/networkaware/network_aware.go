@@ -232,10 +232,7 @@ func (d *NetworkAware) scoreCandidatesAtIndex(ctx context.Context, nodes []*v1.N
 
 func (d *NetworkAware) feasibleAlternativeNodes(ctx context.Context, pod *v1.Pod, nodes []*v1.Node) []*v1.Node {
 	feasible := make([]*v1.Node, 0, len(nodes))
-	for _, candidate := range nodes {
-		if candidate.Name == pod.Spec.NodeName {
-			continue
-		}
+	for _, candidate := range crossZoneAlternativeNodes(pod, nodes) {
 		if err := nodeutil.NodeFit(ctx, d.handle.GetPodsAssignedToNodeFunc(), pod, candidate); err != nil {
 			d.logger.V(3).Info("alternative node is not feasible for pod", "pod", klog.KObj(pod), "node", candidate.Name, "reason", err)
 			continue
@@ -244,6 +241,25 @@ func (d *NetworkAware) feasibleAlternativeNodes(ctx context.Context, pod *v1.Pod
 		feasible = append(feasible, candidate)
 	}
 	return feasible
+}
+
+func crossZoneAlternativeNodes(pod *v1.Pod, nodes []*v1.Node) []*v1.Node {
+	var currentNode *v1.Node
+	for _, node := range nodes {
+		if node.Name == pod.Spec.NodeName {
+			currentNode = node
+			break
+		}
+	}
+
+	alternatives := make([]*v1.Node, 0, len(nodes))
+	for _, candidate := range nodes {
+		if candidate.Name == pod.Spec.NodeName || sameZone(currentNode, candidate) {
+			continue
+		}
+		alternatives = append(alternatives, candidate)
+	}
+	return alternatives
 }
 
 func (d *NetworkAware) bestAlternative(pod *v1.Pod, currentCost float64, nodes []*v1.Node, preScore preScoreState) (string, float64, bool) {
