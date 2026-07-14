@@ -9,19 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func TestScoreLowestImprovingIndexStopsAtFirstImprovingLayer(t *testing.T) {
-	scored := firstImprovingIndex([]int{0, 1, 2}, func(index int) []scoredPod {
-		if index != 1 {
-			return nil
-		}
-		return []scoredPod{{pod: pod("cart", "default", "2", "shop", "cart", "1", "b"), index: index}}
-	})
-
-	if len(scored) != 1 || scored[0].index != 1 {
-		t.Fatalf("scored = %#v, want one candidate from index 1", scored)
-	}
-}
-
 func TestSortScoredPodsOrdersWithinIndexByImprovement(t *testing.T) {
 	scored := []scoredPod{
 		{pod: pod("smaller", "default", "1", "shop", "smaller", "2", "a"), index: 2, cost: 100, targetCost: 80, improvement: 20},

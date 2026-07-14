@@ -4,12 +4,15 @@
 Sophos scheduler `NetworkAware` plugin, but it evaluates pods by `index` layer
 to encourage staged convergence.
 
-Each descheduler cycle starts at `minPodIndex` and scans indexes upward. The
-first index layer with at least one pod that has a feasible cost-improving move
-is selected. Pods in that layer are attempted by highest
-`currentCost - bestAlternativeCost`; failed eviction attempts are skipped. The
-cycle stops after that layer, giving the scheduler time to place evicted pods
-before downstream indexes are considered.
+Each descheduler cycle starts at `minPodIndex` and scans every index upward.
+Pods with a feasible cost-improving move are attempted by highest
+`currentCost - bestAlternativeCost` within each layer, then processing continues
+with the next layer. Failed eviction attempts are skipped and do not prevent
+later pods or layers from being considered. Evicted pods enter the scheduler
+queue in layer order: every eviction request in a layer is accepted or rejected
+before the next layer is evaluated. This allows the scheduler to place lower
+indexes before higher indexes without making the descheduler wait for pod
+deletion or rescheduling to finish.
 
 ```yaml
 - name: NetworkAware
@@ -19,8 +22,8 @@ before downstream indexes are considered.
     minCommunicationCost: 0
     minCostImprovement: 0
     ignoreSameZoneNetworkCost: true
-    # Optional. If omitted, every improving pod in the selected index layer may
-    # be evicted, subject to DefaultEvictor and global descheduler limits.
+    # Optional. If omitted, every improving pod across all index layers may be
+    # evicted, subject to DefaultEvictor and global descheduler limits.
     maxPodsToEvict: 3
     namespaces:
       include: [default]

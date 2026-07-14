@@ -96,40 +96,50 @@ func (d *NetworkAware) Deschedule(ctx context.Context, nodes []*v1.Node) *framew
 		return &frameworktypes.Status{Err: err}
 	}
 
-	scored := d.scoreLowestImprovingIndex(ctx, nodes, pods)
-	if len(scored) == 0 {
-		d.logger.V(1).Info("completed cycle without eviction because no index layer has a sufficiently better feasible placement")
-		return nil
-	}
-
-	sortScoredPods(scored)
 	evicted := uint(0)
-	for _, candidate := range scored {
-		if d.reachedMaxPodsToEvict(evicted) {
-			break
-		}
-		d.logger.V(1).Info("selected pod for index-layered network-aware eviction", "pod", klog.KObj(candidate.pod), "index", candidate.index, "eligibleCandidates", len(scored), "currentNode", candidate.pod.Spec.NodeName, "currentCost", candidate.cost, "bestNode", candidate.targetNode, "bestCost", candidate.targetCost, "improvement", candidate.improvement, "maxPodsToEvict", d.args.MaxPodsToEvict)
-		if !d.handle.Evictor().PreEvictionFilter(candidate.pod) {
-			d.logger.Info("selected pod rejected by the final pre-eviction filter", "pod", klog.KObj(candidate.pod), "index", candidate.index)
+	eligible := 0
+	for _, index := range pods.indexes {
+		scored := d.scoreCandidatesAtIndex(ctx, nodes, pods, index)
+		if len(scored) == 0 {
+			d.logger.V(2).Info("index layer has no improving candidates", "index", index)
 			continue
 		}
-		d.logger.Info("evicting pod with feasible communication-cost improvement", "pod", klog.KObj(candidate.pod), "index", candidate.index, "cost", candidate.cost, "bestNode", candidate.targetNode, "bestCost", candidate.targetCost, "improvement", candidate.improvement)
-		if err := d.handle.Evictor().Evict(ctx, candidate.pod, evictions.EvictOptions{StrategyName: PluginName}); err != nil {
-			switch err.(type) {
-			case *evictions.EvictionTotalLimitError:
-				d.logger.V(1).Info("stopping network-aware evictions because the total eviction limit was reached", "evicted", evicted)
+		sortScoredPods(scored)
+		eligible += len(scored)
+		d.logger.V(1).Info("processing improving network-aware index layer", "index", index, "candidates", len(scored))
+
+		// Keep eviction requests strictly layer-ordered: every candidate in this
+		// layer is attempted before candidates in the next layer are scored.
+		layerEvicted := uint(0)
+		for _, candidate := range scored {
+			if d.reachedMaxPodsToEvict(evicted) {
+				d.logger.V(1).Info("stopping network-aware evictions because the plugin eviction limit was reached", "evicted", evicted)
 				return nil
-			case *evictions.EvictionNodeLimitError, *evictions.EvictionNamespaceLimitError:
-				d.logger.V(2).Info("skipping selected pod because an eviction limit was reached", "pod", klog.KObj(candidate.pod), "error", err)
-				continue
-			default:
-				d.logger.V(2).Info("skipping selected pod because eviction was rejected", "pod", klog.KObj(candidate.pod), "error", err)
+			}
+			d.logger.V(1).Info("selected pod for index-layered network-aware eviction", "pod", klog.KObj(candidate.pod), "index", candidate.index, "eligibleCandidatesInLayer", len(scored), "currentNode", candidate.pod.Spec.NodeName, "currentCost", candidate.cost, "bestNode", candidate.targetNode, "bestCost", candidate.targetCost, "improvement", candidate.improvement, "maxPodsToEvict", d.args.MaxPodsToEvict)
+			if !d.handle.Evictor().PreEvictionFilter(candidate.pod) {
+				d.logger.Info("selected pod rejected by the final pre-eviction filter", "pod", klog.KObj(candidate.pod), "index", candidate.index)
 				continue
 			}
+			d.logger.Info("evicting pod with feasible communication-cost improvement", "pod", klog.KObj(candidate.pod), "index", candidate.index, "cost", candidate.cost, "bestNode", candidate.targetNode, "bestCost", candidate.targetCost, "improvement", candidate.improvement)
+			if err := d.handle.Evictor().Evict(ctx, candidate.pod, evictions.EvictOptions{StrategyName: PluginName}); err != nil {
+				switch err.(type) {
+				case *evictions.EvictionTotalLimitError:
+					d.logger.V(1).Info("stopping network-aware evictions because the total eviction limit was reached", "evicted", evicted)
+					return nil
+				case *evictions.EvictionNodeLimitError, *evictions.EvictionNamespaceLimitError:
+					d.logger.V(2).Info("skipping selected pod because an eviction limit was reached", "pod", klog.KObj(candidate.pod), "error", err)
+				default:
+					d.logger.V(2).Info("skipping selected pod because eviction was rejected", "pod", klog.KObj(candidate.pod), "error", err)
+				}
+				continue
+			}
+			evicted++
+			layerEvicted++
 		}
-		evicted++
+		d.logger.V(1).Info("completed network-aware index layer", "index", index, "candidates", len(scored), "evicted", layerEvicted)
 	}
-	d.logger.V(1).Info("completed network-aware eviction cycle", "index", scored[0].index, "eligibleCandidates", len(scored), "evicted", evicted)
+	d.logger.V(1).Info("completed network-aware eviction cycle", "processedIndexes", len(pods.indexes), "eligibleCandidates", eligible, "evicted", evicted)
 	return nil
 }
 
@@ -171,27 +181,6 @@ func (d *NetworkAware) collectPodsForCostAnalysis(nodes []*v1.Node) (costAnalysi
 
 	d.logger.V(2).Info("collected pods for cost analysis", "pods", len(pods.all), "candidateIndexes", len(pods.indexes))
 	return pods, nil
-}
-
-func (d *NetworkAware) scoreLowestImprovingIndex(ctx context.Context, nodes []*v1.Node, pods costAnalysisPods) []scoredPod {
-	return firstImprovingIndex(pods.indexes, func(index int) []scoredPod {
-		scored := d.scoreCandidatesAtIndex(ctx, nodes, pods, index)
-		if len(scored) > 0 {
-			d.logger.V(1).Info("found improving network-aware index layer", "index", index, "candidates", len(scored))
-			return scored
-		}
-		d.logger.V(2).Info("index layer has no improving candidates", "index", index)
-		return nil
-	})
-}
-
-func firstImprovingIndex(indexes []int, score func(int) []scoredPod) []scoredPod {
-	for _, index := range indexes {
-		if scored := score(index); len(scored) > 0 {
-			return scored
-		}
-	}
-	return nil
 }
 
 func (d *NetworkAware) scoreCandidatesAtIndex(ctx context.Context, nodes []*v1.Node, pods costAnalysisPods, index int) []scoredPod {
