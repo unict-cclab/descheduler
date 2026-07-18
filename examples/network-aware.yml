@@ -30,7 +30,7 @@ profiles:
               - PodsWithLocalStorage
       - name: NetworkAware
         args:
-          minPodAgeSeconds: 30
+          minPodAgeSeconds: 10
           minPodIndex: 0
           minCommunicationCost: 0
           minCostImprovement: 0
