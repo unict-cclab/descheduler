@@ -1,0 +1,32 @@
+apiVersion: descheduler/v1alpha2
+kind: DeschedulerPolicy
+profiles:
+  - name: network-aware
+    pluginConfig:
+      - name: DefaultEvictor
+        args:
+          podProtections:
+            defaultDisabled:
+              - PodsWithLocalStorage
+      - name: NetworkAware
+        args:
+          minPodAgeSeconds: 10
+          minPodIndex: 0
+          minCommunicationCost: 0
+          minCostImprovement: 0
+          ignoreSameZoneNetworkCost: true
+          namespaces:
+            include:
+              - default
+          labelSelector:
+            matchLabels:
+              group: onlineboutique
+            matchExpressions:
+              - key: component
+                operator: NotIn
+                values:
+                  - node-proxy
+    plugins:
+      deschedule:
+        enabled:
+          - NetworkAware
