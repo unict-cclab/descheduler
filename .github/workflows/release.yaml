@@ -1,4 +1,4 @@
-name: UNICT descheduler image
+name: Release
 
 on:
   push:

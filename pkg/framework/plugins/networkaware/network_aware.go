@@ -79,6 +79,7 @@ func New(ctx context.Context, obj runtime.Object, handle frameworktypes.Handle) 
 	if args.LabelSelector != nil {
 		options = options.WithLabelSelector(args.LabelSelector)
 	}
+	handle.SharedInformerFactory().Policy().V1().PodDisruptionBudgets().Informer()
 	filter, err := options.WithFilter(podutil.WrapFilterFuncs(handle.Evictor().Filter, handle.Evictor().PreEvictionFilter)).BuildFilterFunc()
 	if err != nil {
 		return nil, err
@@ -96,6 +97,7 @@ func (d *NetworkAware) Deschedule(ctx context.Context, nodes []*v1.Node) *framew
 		return &frameworktypes.Status{Err: err}
 	}
 
+	pdbBudget := make(map[string]int32)
 	evicted := uint(0)
 	eligible := 0
 	for _, index := range pods.indexes {
@@ -115,6 +117,10 @@ func (d *NetworkAware) Deschedule(ctx context.Context, nodes []*v1.Node) *framew
 				return nil
 			}
 			d.logger.V(1).Info("selected pod for index-layered network-aware eviction", "pod", klog.KObj(candidate.pod), "index", candidate.index, "eligibleCandidatesInLayer", len(scored), "currentNode", candidate.pod.Spec.NodeName, "currentCost", candidate.cost, "bestNode", candidate.targetNode, "bestCost", candidate.targetCost, "improvement", candidate.improvement, "maxPodsToEvict", d.args.MaxPodsToEvict)
+			pdbKey, allowed := d.pdbAllowsEviction(candidate.pod, pdbBudget)
+			if !allowed {
+				continue
+			}
 			if !d.handle.Evictor().PreEvictionFilter(candidate.pod) {
 				d.logger.Info("selected pod rejected by the final pre-eviction filter", "pod", klog.KObj(candidate.pod), "index", candidate.index)
 				continue
@@ -131,6 +137,9 @@ func (d *NetworkAware) Deschedule(ctx context.Context, nodes []*v1.Node) *framew
 					d.logger.V(2).Info("skipping selected pod because eviction was rejected", "pod", klog.KObj(candidate.pod), "error", err)
 				}
 				continue
+			}
+			if pdbKey != "" {
+				pdbBudget[pdbKey]--
 			}
 			evicted++
 			layerEvicted++
@@ -162,6 +171,9 @@ func (d *NetworkAware) collectPodsForCostAnalysis(nodes []*v1.Node) (costAnalysi
 			}
 			if !d.podFilter(pod) {
 				d.logger.V(4).Info("pod rejected by eviction filters", "pod", klog.KObj(pod), "node", node.Name, "index", index)
+				continue
+			}
+			if _, allowed := d.pdbAllowsEviction(pod, nil); !allowed {
 				continue
 			}
 			if !d.oldEnough(pod) {
