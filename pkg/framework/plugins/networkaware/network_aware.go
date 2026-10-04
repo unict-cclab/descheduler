@@ -90,7 +90,7 @@ func New(ctx context.Context, obj runtime.Object, handle frameworktypes.Handle) 
 func (d *NetworkAware) Name() string { return PluginName }
 
 func (d *NetworkAware) Deschedule(ctx context.Context, nodes []*v1.Node) *frameworktypes.Status {
-	d.logger.V(1).Info("starting network-aware descheduling cycle", "nodes", len(nodes), "minPodIndex", d.minPodIndex(), "minCommunicationCost", d.args.MinCommunicationCost, "minCostImprovement", d.args.MinCostImprovement, "maxPodsToEvict", d.args.MaxPodsToEvict, "ignoreSameZoneNetworkCost", d.args.IgnoreSameZoneNetworkCost)
+	d.logger.V(1).Info("starting network-aware descheduling cycle", "nodes", len(nodes), "minPodIndex", d.minPodIndex(), "minCommunicationCost", d.args.MinCommunicationCost, "minCostImprovement", d.args.MinCostImprovement, "maxPodsToEvict", d.args.MaxPodsToEvict, "ignoreSameZoneNetworkCost", d.args.IgnoreSameZoneNetworkCost, "stopAfterEvictedLayer", d.args.StopAfterEvictedLayer)
 
 	pods, err := d.collectPodsForCostAnalysis(nodes)
 	if err != nil {
@@ -145,6 +145,10 @@ func (d *NetworkAware) Deschedule(ctx context.Context, nodes []*v1.Node) *framew
 			layerEvicted++
 		}
 		d.logger.V(1).Info("completed network-aware index layer", "index", index, "candidates", len(scored), "evicted", layerEvicted)
+		if d.args.StopAfterEvictedLayer && layerEvicted > 0 {
+			d.logger.V(1).Info("stopping network-aware cycle after an index layer with successful evictions", "index", index, "layerEvicted", layerEvicted, "evicted", evicted)
+			return nil
+		}
 	}
 	d.logger.V(1).Info("completed network-aware eviction cycle", "processedIndexes", len(pods.indexes), "eligibleCandidates", eligible, "evicted", evicted)
 	return nil

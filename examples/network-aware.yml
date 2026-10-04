@@ -15,6 +15,7 @@ profiles:
           minCommunicationCost: 0
           minCostImprovement: 0
           ignoreSameZoneNetworkCost: true
+          stopAfterEvictedLayer: false
           namespaces:
             include:
               - default

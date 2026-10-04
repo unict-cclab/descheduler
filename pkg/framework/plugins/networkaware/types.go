@@ -16,6 +16,7 @@ type NetworkAwareArgs struct {
 	MinCostImprovement        float64               `json:"minCostImprovement,omitempty"`
 	MaxPodsToEvict            *uint                 `json:"maxPodsToEvict,omitempty"`
 	IgnoreSameZoneNetworkCost bool                  `json:"ignoreSameZoneNetworkCost,omitempty"`
+	StopAfterEvictedLayer     bool                  `json:"stopAfterEvictedLayer,omitempty"`
 }
 
 func (in *NetworkAwareArgs) DeepCopyInto(out *NetworkAwareArgs) {
