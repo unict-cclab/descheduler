@@ -370,14 +370,16 @@ func newPreScoreState(pod *v1.Pod, candidateNodes []*v1.Node, peerPods []*v1.Pod
 			if ignoreSameZoneNetworkCost && sameZone(candidate, peer.node) {
 				metrics.zeroCost = true
 			}
-			if metrics.latency > maxMetrics.latency {
-				maxMetrics.latency = metrics.latency
-			}
-			if metrics.bandwidth > maxMetrics.bandwidth {
-				maxMetrics.bandwidth = metrics.bandwidth
-			}
-			if metrics.packetLoss > maxMetrics.packetLoss {
-				maxMetrics.packetLoss = metrics.packetLoss
+			if !metrics.zeroCost {
+				if metrics.latency > maxMetrics.latency {
+					maxMetrics.latency = metrics.latency
+				}
+				if metrics.bandwidth > maxMetrics.bandwidth {
+					maxMetrics.bandwidth = metrics.bandwidth
+				}
+				if metrics.packetLoss > maxMetrics.packetLoss {
+					maxMetrics.packetLoss = metrics.packetLoss
+				}
 			}
 			metricsForNode = append(metricsForNode, metrics)
 		}
