@@ -11,6 +11,9 @@ import (
 func ValidateNetworkAwareArgs(obj runtime.Object) error {
 	args := obj.(*NetworkAwareArgs)
 	var errs []error
+	if _, err := validateWeights(args.LatencyWeight, args.BandwidthWeight, args.PacketLossWeight); err != nil {
+		errs = append(errs, err)
+	}
 	if args.Namespaces != nil && len(args.Namespaces.Include) > 0 && len(args.Namespaces.Exclude) > 0 {
 		errs = append(errs, fmt.Errorf("only one of Include/Exclude namespaces can be set"))
 	}

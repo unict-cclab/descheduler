@@ -83,7 +83,7 @@ func TestCommunicationCostMirrorsSchedulerModel(t *testing.T) {
 		packetLoss: 10,
 	}
 
-	got := communicationCost(metrics, maxMetrics, 50, 100)
+	got := communicationCost(metrics, maxMetrics, 50, 100, [3]float64{1, 1, 1})
 	want := 0.725
 	if math.Abs(got-want) > 0.000001 {
 		t.Fatalf("cost = %v, want %v", got, want)
@@ -120,14 +120,14 @@ func TestPreScoreStateIgnoresSameZoneWhenEnabled(t *testing.T) {
 		[]*v1.Pod{pod("peer", "default", "2", "shop", "peer", "0", "peer")},
 		map[string]*v1.Node{"candidate": candidate, "peer": peer},
 		map[string]string{"traffic.peer": "10"},
-		true,
+		true, [3]float64{1, 1, 1},
 	)
 	metrics := preScore.metricsByNode["candidate"][0]
 
 	if !metrics.zeroCost {
 		t.Fatalf("metrics = %#v, want zero-cost marker", metrics)
 	}
-	if cost := communicationCost(metrics, nodeNetworkMetrics{bandwidth: 1000}, 50, 100); cost != 0 {
+	if cost := communicationCost(metrics, nodeNetworkMetrics{bandwidth: 1000}, 50, 100, [3]float64{1, 1, 1}); cost != 0 {
 		t.Fatalf("cost = %v, want 0", cost)
 	}
 }
@@ -162,7 +162,7 @@ func TestPreScoreStateKeepsCrossZoneMetrics(t *testing.T) {
 		[]*v1.Pod{pod("peer", "default", "2", "shop", "peer", "0", "peer")},
 		map[string]*v1.Node{"candidate": candidate, "peer": peer},
 		map[string]string{"traffic.peer": "10"},
-		true,
+		true, [3]float64{1, 1, 1},
 	)
 	metrics := preScore.metricsByNode["candidate"][0]
 
@@ -224,7 +224,7 @@ func TestNormalizationExcludesZeroCostLinks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			state := newPreScoreState(pod("frontend", "default", "1", "shop", "frontend", "1", "local"), tt.nodes,
 				[]*v1.Pod{pod("peer", "default", "2", "shop", "peer", "0", "peer")},
-				map[string]*v1.Node{"local": local, "remote": remote, "other": other, "peer": peer}, map[string]string{"traffic.peer": "10"}, tt.ignore)
+				map[string]*v1.Node{"local": local, "remote": remote, "other": other, "peer": peer}, map[string]string{"traffic.peer": "10"}, tt.ignore, [3]float64{1, 1, 1})
 			if state.maxMetrics != tt.want {
 				t.Fatalf("max metrics = %+v, want %+v", state.maxMetrics, tt.want)
 			}

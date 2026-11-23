@@ -24,6 +24,7 @@ const PluginName = "NetworkAware"
 var _ frameworktypes.DeschedulePlugin = &NetworkAware{}
 
 type NetworkAware struct {
+	weights   [3]float64
 	logger    klog.Logger
 	handle    frameworktypes.Handle
 	args      *NetworkAwareArgs
@@ -40,6 +41,7 @@ type scoredPod struct {
 }
 
 type preScoreState struct {
+	weights       [3]float64
 	peers         []peerPlacement
 	metricsByNode map[string][]nodeNetworkMetrics
 	maxTraffic    float64
@@ -70,6 +72,10 @@ func New(ctx context.Context, obj runtime.Object, handle frameworktypes.Handle) 
 	if !ok {
 		return nil, fmt.Errorf("want args of type NetworkAwareArgs, got %T", obj)
 	}
+	weights, err := validateWeights(args.LatencyWeight, args.BandwidthWeight, args.PacketLossWeight)
+	if err != nil {
+		return nil, err
+	}
 	var included, excluded sets.Set[string]
 	if args.Namespaces != nil {
 		included = sets.New(args.Namespaces.Include...)
@@ -84,7 +90,7 @@ func New(ctx context.Context, obj runtime.Object, handle frameworktypes.Handle) 
 	if err != nil {
 		return nil, err
 	}
-	return &NetworkAware{logger: klog.FromContext(ctx).WithValues("plugin", PluginName), handle: handle, args: args, podFilter: filter}, nil
+	return &NetworkAware{logger: klog.FromContext(ctx).WithValues("plugin", PluginName), handle: handle, args: args, weights: weights, podFilter: filter}, nil
 }
 
 func (d *NetworkAware) Name() string { return PluginName }
@@ -208,7 +214,7 @@ func (d *NetworkAware) scoreCandidatesAtIndex(ctx context.Context, nodes []*v1.N
 		}
 		feasibleNodes := d.feasibleAlternativeNodes(ctx, pod, nodes)
 		modelNodes := append([]*v1.Node{pods.nodeByName[pod.Spec.NodeName]}, feasibleNodes...)
-		preScore := newPreScoreState(pod, modelNodes, pods.all, pods.nodeByName, traffic, d.args.IgnoreSameZoneNetworkCost)
+		preScore := newPreScoreState(pod, modelNodes, pods.all, pods.nodeByName, traffic, d.args.IgnoreSameZoneNetworkCost, d.weights)
 		cost := preScore.communicationCost(pod.Spec.NodeName)
 		d.logger.V(2).Info("calculated current pod communication cost", "pod", klog.KObj(pod), "node", pod.Spec.NodeName, "index", index, "cost", cost)
 		if cost <= d.args.MinCommunicationCost {
@@ -327,7 +333,7 @@ func (d *NetworkAware) trafficAnnotations(ctx context.Context, pod *v1.Pod) (map
 	return deployment.Annotations, nil
 }
 
-func newPreScoreState(pod *v1.Pod, candidateNodes []*v1.Node, peerPods []*v1.Pod, nodeByName map[string]*v1.Node, traffic map[string]string, ignoreSameZoneNetworkCost bool) preScoreState {
+func newPreScoreState(pod *v1.Pod, candidateNodes []*v1.Node, peerPods []*v1.Pod, nodeByName map[string]*v1.Node, traffic map[string]string, ignoreSameZoneNetworkCost bool, weights [3]float64) preScoreState {
 	group := pod.Labels["group"]
 
 	peers := make([]peerPlacement, 0, len(peerPods))
@@ -391,6 +397,7 @@ func newPreScoreState(pod *v1.Pod, candidateNodes []*v1.Node, peerPods []*v1.Pod
 		metricsByNode: metricsByNode,
 		maxTraffic:    maxTraffic,
 		maxMetrics:    maxMetrics,
+		weights:       weights,
 	}
 }
 
@@ -430,7 +437,7 @@ func (s preScoreState) communicationCost(nodeName string) float64 {
 	}
 	var total float64
 	for i, peer := range s.peers {
-		total += communicationCost(metrics[i], s.maxMetrics, peer.traffic, s.maxTraffic)
+		total += communicationCost(metrics[i], s.maxMetrics, peer.traffic, s.maxTraffic, s.weights)
 	}
 	return total
 }
@@ -440,7 +447,7 @@ func parseNodeNetworkAnnotation(node *v1.Node, key string) float64 {
 	return value
 }
 
-func communicationCost(metrics, maxMetrics nodeNetworkMetrics, traffic, maxTraffic float64) float64 {
+func communicationCost(metrics, maxMetrics nodeNetworkMetrics, traffic, maxTraffic float64, weights [3]float64) float64 {
 	if metrics.zeroCost {
 		return 0
 	}
@@ -454,7 +461,7 @@ func communicationCost(metrics, maxMetrics nodeNetworkMetrics, traffic, maxTraff
 	}
 
 	latencyRatio := 0.0
-	if metrics.latency > 0 && maxMetrics.latency > 0 {
+	if weights[0] > 0 && metrics.latency > 0 && maxMetrics.latency > 0 {
 		latencyRatio = metrics.latency / maxMetrics.latency
 	}
 	if latencyRatio > 1 {
@@ -462,7 +469,7 @@ func communicationCost(metrics, maxMetrics nodeNetworkMetrics, traffic, maxTraff
 	}
 
 	bandwidthRatio := 1.0
-	if maxMetrics.bandwidth > 0 {
+	if weights[1] > 0 && maxMetrics.bandwidth > 0 {
 		if metrics.bandwidth <= 0 {
 			bandwidthRatio = 0
 		} else {
@@ -474,12 +481,12 @@ func communicationCost(metrics, maxMetrics nodeNetworkMetrics, traffic, maxTraff
 	}
 
 	packetLossRatio := 0.0
-	if metrics.packetLoss > 0 && maxMetrics.packetLoss > 0 {
+	if weights[2] > 0 && metrics.packetLoss > 0 && maxMetrics.packetLoss > 0 {
 		packetLossRatio = metrics.packetLoss / maxMetrics.packetLoss
 	}
 	if packetLossRatio > 1 {
 		packetLossRatio = 1
 	}
 
-	return trafficRatio * (latencyRatio + 1 - bandwidthRatio + packetLossRatio)
+	return trafficRatio * (weights[0]*latencyRatio + weights[1]*(1-bandwidthRatio) + weights[2]*packetLossRatio)
 }

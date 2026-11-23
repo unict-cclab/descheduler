@@ -16,11 +16,26 @@ type NetworkAwareArgs struct {
 	MinCostImprovement        float64               `json:"minCostImprovement,omitempty"`
 	MaxPodsToEvict            *uint                 `json:"maxPodsToEvict,omitempty"`
 	IgnoreSameZoneNetworkCost bool                  `json:"ignoreSameZoneNetworkCost,omitempty"`
+	LatencyWeight             *float64              `json:"latencyWeight"`
+	BandwidthWeight           *float64              `json:"bandwidthWeight"`
+	PacketLossWeight          *float64              `json:"packetLossWeight"`
 	StopAfterEvictedLayer     bool                  `json:"stopAfterEvictedLayer,omitempty"`
 }
 
 func (in *NetworkAwareArgs) DeepCopyInto(out *NetworkAwareArgs) {
 	*out = *in
+	if in.LatencyWeight != nil {
+		value := *in.LatencyWeight
+		out.LatencyWeight = &value
+	}
+	if in.BandwidthWeight != nil {
+		value := *in.BandwidthWeight
+		out.BandwidthWeight = &value
+	}
+	if in.PacketLossWeight != nil {
+		value := *in.PacketLossWeight
+		out.PacketLossWeight = &value
+	}
 	if in.Namespaces != nil {
 		out.Namespaces = in.Namespaces.DeepCopy()
 	}
