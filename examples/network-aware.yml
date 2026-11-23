@@ -14,9 +14,9 @@ profiles:
           minPodIndex: 0
           minCommunicationCost: 0
           minCostImprovement: 0
-          latencyWeight: 0.3333333333333333
-          bandwidthWeight: 0.3333333333333333
-          packetLossWeight: 0.3333333333333333
+          latencyWeight: 1
+          bandwidthWeight: 1
+          packetLossWeight: 1
           ignoreSameZoneNetworkCost: true
           stopAfterEvictedLayer: false
           namespaces:

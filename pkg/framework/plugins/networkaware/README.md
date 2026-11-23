@@ -2,15 +2,16 @@
 
 Both scheduler and descheduler require `latencyWeight`, `bandwidthWeight` and
 `packetLossWeight` in the NetworkAware plugin arguments. Each value must be finite
-and between 0 and 1. Their sum must equal 1 within an absolute tolerance of 1e-9.
-Missing values are rejected; explicitly set zero to disable a term.
+and non-negative. Missing values are rejected. Values above 1 are allowed; no
+sum constraint or weight normalization is applied. Zero disables a term, and all
+three weights may be zero to disable the communication cost entirely.
 
-Equal weighting:
+Equal weighting, preserving the previous cost scale:
 
 ```yaml
-latencyWeight: 0.3333333333333333
-bandwidthWeight: 0.3333333333333333
-packetLossWeight: 0.3333333333333333
+latencyWeight: 1
+bandwidthWeight: 1
+packetLossWeight: 1
 ```
 
 Latency only:
@@ -23,10 +24,10 @@ packetLossWeight: 0
 
 The cost per peer is the normalized traffic multiplied by the weighted sum of
 normalized latency, `1 - normalized bandwidth`, and normalized packet loss.
-The same-zone exclusion and metric normalization are unchanged. Use identical
+Metric normalization and the same-zone exclusion are unchanged. Use identical
 weights in scheduler and descheduler.
 
-Existing configurations must specify the three weights before using this version.
-Equal weights preserve the relative order of costs but divide their old values
-by three. To retain equivalent descheduler thresholds, divide
-`minCommunicationCost` and `minCostImprovement` by three as well.
+Existing configurations must explicitly specify the three weights before using
+this version. Setting them all to 1 preserves the previous communication costs
+and descheduler thresholds. Changing their absolute scale changes the meaning
+of `minCommunicationCost` and `minCostImprovement`.
