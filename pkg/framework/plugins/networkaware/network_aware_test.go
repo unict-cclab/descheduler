@@ -318,3 +318,35 @@ func TestNewRejectsMissingWeights(t *testing.T) {
 		t.Fatal("missing weights accepted")
 	}
 }
+
+func TestPreScoreExcludesTerminatingPeers(t *testing.T) {
+	for _, ready := range []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionFalse} {
+		t.Run(string(ready), func(t *testing.T) {
+			candidate := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "candidate", Annotations: map[string]string{
+				"network-latency.active": "20", "network-bandwidth.active": "100", "packet-loss.active": "0",
+				"network-latency.old": "1000", "network-bandwidth.old": "1000", "packet-loss.old": "10",
+			}}}
+			activeNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "active"}}
+			oldNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "old"}}
+			target := pod("target", "default", "target", "shop", "frontend", "1", "candidate")
+			active := pod("active", "default", "active", "shop", "active", "0", "active")
+			active.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: ready}}
+			terminating := pod("old", "default", "old", "shop", "old", "0", "old")
+			timestamp := metav1.Now()
+			terminating.DeletionTimestamp = &timestamp
+			terminating.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}
+			state := newPreScoreState(target, []*v1.Node{candidate}, []*v1.Pod{terminating, active},
+				map[string]*v1.Node{"candidate": candidate, "active": activeNode, "old": oldNode},
+				map[string]string{"traffic.active": "10", "traffic.old": "100"}, false, [3]float64{1, 0, 0})
+			if len(state.peers) != 1 || state.peers[0].node.Name != "active" {
+				t.Fatalf("unexpected peers: %+v", state.peers)
+			}
+			if state.maxTraffic != 10 || state.maxMetrics != (nodeNetworkMetrics{latency: 20, bandwidth: 100}) {
+				t.Fatalf("terminating peer affected normalization: traffic=%v metrics=%+v", state.maxTraffic, state.maxMetrics)
+			}
+			if cost := state.communicationCost("candidate"); cost != 1 {
+				t.Fatalf("cost = %v, want 1", cost)
+			}
+		})
+	}
+}

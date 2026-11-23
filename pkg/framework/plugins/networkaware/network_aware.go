@@ -339,7 +339,7 @@ func newPreScoreState(pod *v1.Pod, candidateNodes []*v1.Node, peerPods []*v1.Pod
 	peers := make([]peerPlacement, 0, len(peerPods))
 	maxTraffic := 0.0
 	for _, peerPod := range peerPods {
-		if peerPod.UID == pod.UID || peerPod.Namespace != pod.Namespace || group == "" || peerPod.Labels["group"] != group {
+		if peerPod.DeletionTimestamp != nil || peerPod.UID == pod.UID || peerPod.Namespace != pod.Namespace || group == "" || peerPod.Labels["group"] != group {
 			continue
 		}
 		if !hasLowerOrEqualIndex(pod, peerPod) {
